@@ -24,7 +24,6 @@ class TutorState(TypedDict):
 def clasificador_nodo(state: TutorState):
     ultimo_mensaje = state["messages"][-1].content
     
-    # Mejoramos el prompt para ser más estrictos
     prompt = f"""
     Analiza la duda: "{ultimo_mensaje}"
     Responde UNICAMENTE con una palabra de estas opciones: [python, java, go, general].
