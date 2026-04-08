@@ -11,7 +11,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver # Para la memoria
 
 
 load_dotenv()
-llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.2)
+llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
 
 conn = sqlite3.connect("tutor_memoria.db", check_same_thread=False)
 memory = SqliteSaver(conn)
@@ -42,15 +42,36 @@ def clasificador_nodo(state: TutorState):
     return {"lenguaje_detectado": lenguaje}
 
 def experto_python(state: TutorState):
-    prompt = "Eres un experto en Python. Explica conceptos usando PEP 8 y ejemplos claros de indentación."
+    prompt = "Eres un experto en Python. ",
+    "Explica conceptos usando PEP 8 y ejemplos claros de indentación. ",
+    "REGLA DE ORO: Tienes estrictamente prohibido generar bloques de código completos o corregidos.",
+    "Si el código del estudiante falla:",
+    "1. Identifica el error (ej: IndentationError, TypeError).",
+    "2. Explica conceptualmente por qué ocurre (basado en PEP 8 o lógica de Python).",
+    "3. Da pistas sobre cómo solucionarlo (ej: Revisa el nivel de sangría después del 'if' o Asegúrate de convertir el input a entero)."
+    "4. Si necesitas mostrar algo, usa máximo una línea de ejemplo conceptual, NUNCA el bloque completo."
     return {"messages": [llm.invoke([HumanMessage(content=prompt)] + state["messages"])]}
 
 def experto_java(state: TutorState):
-    prompt = "Eres un experto en Java. Enfócate en tipos de datos, clases y el rigor de la sintaxis de Java."
+    prompt = "Eres un experto en Java.",
+    "Enfócate en tipos de datos, clases y el rigor de la sintaxis de Java.",
+    "REGLA DE ORO: Tienes estrictamente prohibido generar bloques de código completos o corregidos.",
+    "Si el código del estudiante falla:",
+    "1. Señala el error técnico (ej: Falta de punto y coma, error de tipos, o mala definición de clase).",
+    "2. Explica la regla de Java que se está rompiendo (ej: En Java, toda variable debe tener un tipo definido).",
+    "3. Sugiere los pasos lógicos para la corrección sin escribir la sintaxis final."
+    "4. Fomenta el uso de buenas prácticas de Programación Orientada a Objetos."
     return {"messages": [llm.invoke([HumanMessage(content=prompt)] + state["messages"])]}
 
 def experto_go(state: TutorState):
-    prompt = "Eres un experto en Go. Explica la simplicidad de Go, punteros y manejo de errores."
+    prompt = "Eres un experto en Go.",
+    "Explica la simplicidad de Go, punteros y manejo de errores.",
+    "REGLA DE ORO: Tienes estrictamente prohibido generar bloques de código completos o corregidos.",
+    "Si el código del estudiante falla:",
+    "1. Identifica si es un problema de sintaxis, de manejo de errores (nil checks) o de concurrencia.",
+    "2. Explica la filosofía de Go respecto a ese problema (ej: En Go, los errores son valores y deben ser manejados explícitamente).",
+    "3. Describe qué debe cambiar el estudiante en su lógica, pero deja que él escriba la implementación.",
+    "4. Mantén tus explicaciones minimalistas y directas, como el lenguaje mismo."
     return {"messages": [llm.invoke([HumanMessage(content=prompt)] + state["messages"])]}
 
 def experto_general(state: TutorState):
