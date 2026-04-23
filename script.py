@@ -4,14 +4,14 @@ from typing import Annotated, TypedDict
 from dotenv import load_dotenv
 
 from langchain_groq import ChatGroq
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.sqlite import SqliteSaver # Para la memoria
 
 
 load_dotenv()
-llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0, max_tokens=1024)
 
 conn = sqlite3.connect("tutor_memoria.db", check_same_thread=False)
 memory = SqliteSaver(conn)
@@ -20,6 +20,48 @@ class TutorState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     lenguaje_detectado: str
 
+def prompt_clasificador(lenguaje: str):
+    return f"""Eres tutor de {lenguaje} para principiantes. Sé amigable y usa analogías simples.
+
+**EXPLICACIÓN:** Si preguntan "¿qué es?" o "cómo funciona":
+- Analogía de la vida real (máx 2 párrafos)
+- 1 párrafo técnico  
+- Ejemplo pequeño en {lenguaje}
+
+**CÓDIGO:** Si piden "hazme", "código para", "ejercicio":
+1. Párrafo explicando qué hace (máx 2 líneas)
+2. Código comentado con NÚMEROS DE LÍNEA
+3. PRUEBA DE ESCRITORIO en FORMATO LISTA (ver instrucciones abajo)
+
+**INSTRUCCIONES PARA PRUEBA DE ESCRITORIO:**
+- SELECCIONA entrada SIMPLE: número 2, string "a", lista pequeña
+- NUNCA uses números grandes (23, 100, etc.)
+- FORMATO OBLIGATORIO con viñetas y sub-viñetas:
+  - **Ejecución con entrada:** [valor concreto]
+  - **Línea X:** [descripción del código]
+    - Variable: valor
+    - Condición: resultado
+  - Para bucles: MOSTRAR SOLO resultado comprimido
+    - "Bucle ejecuta 3 iteraciones"
+    - "Estado final: suma = 6"
+  - **Output:** [resultado final]
+  - MÁXIMO 10 líneas
+
+Ejemplo modelo:
+\`\`\`
+**Ejecución con entrada: numero = 2**
+
+**Línea 1:** if (numero < 2)
+  - numero: 2, Condición: False
+
+**Línea 2:** for i in range(2, 2)
+  - Rango vacío → bucle NO se ejecuta
+
+**Línea 3:** return True
+
+**Output:** True
+\`\`\`
+"""
 
 def clasificador_nodo(state: TutorState):
     ultimo_mensaje = state["messages"][-1].content
@@ -42,41 +84,35 @@ def clasificador_nodo(state: TutorState):
     return {"lenguaje_detectado": lenguaje}
 
 def experto_python(state: TutorState):
-    prompt = "Eres un experto en Python. ",
-    "Explica conceptos usando PEP 8 y ejemplos claros de indentación. ",
-    "REGLA DE ORO: Tienes estrictamente prohibido generar bloques de código completos o corregidos.",
-    "Si el código del estudiante falla:",
-    "1. Identifica el error (ej: IndentationError, TypeError).",
-    "2. Explica conceptualmente por qué ocurre (basado en PEP 8 o lógica de Python).",
-    "3. Da pistas sobre cómo solucionarlo (ej: Revisa el nivel de sangría después del 'if' o Asegúrate de convertir el input a entero)."
-    "4. Si necesitas mostrar algo, usa máximo una línea de ejemplo conceptual, NUNCA el bloque completo."
-    return {"messages": [llm.invoke([HumanMessage(content=prompt)] + state["messages"])]}
+    prompt = prompt_clasificador("Python")
+    mensajes_finales = [SystemMessage(content=prompt)] + state["messages"]
+    respuesta = llm.invoke(mensajes_finales)
+    return {"messages": [respuesta]}
 
 def experto_java(state: TutorState):
-    prompt = "Eres un experto en Java.",
-    "Enfócate en tipos de datos, clases y el rigor de la sintaxis de Java.",
-    "REGLA DE ORO: Tienes estrictamente prohibido generar bloques de código completos o corregidos.",
-    "Si el código del estudiante falla:",
-    "1. Señala el error técnico (ej: Falta de punto y coma, error de tipos, o mala definición de clase).",
-    "2. Explica la regla de Java que se está rompiendo (ej: En Java, toda variable debe tener un tipo definido).",
-    "3. Sugiere los pasos lógicos para la corrección sin escribir la sintaxis final."
-    "4. Fomenta el uso de buenas prácticas de Programación Orientada a Objetos."
-    return {"messages": [llm.invoke([HumanMessage(content=prompt)] + state["messages"])]}
+    prompt = prompt_clasificador("Java")
+    mensajes_finales = [SystemMessage(content=prompt)] + state["messages"]
+    respuesta = llm.invoke(mensajes_finales)
+    return {"messages": [respuesta]}
+
 
 def experto_go(state: TutorState):
-    prompt = "Eres un experto en Go.",
-    "Explica la simplicidad de Go, punteros y manejo de errores.",
-    "REGLA DE ORO: Tienes estrictamente prohibido generar bloques de código completos o corregidos.",
-    "Si el código del estudiante falla:",
-    "1. Identifica si es un problema de sintaxis, de manejo de errores (nil checks) o de concurrencia.",
-    "2. Explica la filosofía de Go respecto a ese problema (ej: En Go, los errores son valores y deben ser manejados explícitamente).",
-    "3. Describe qué debe cambiar el estudiante en su lógica, pero deja que él escriba la implementación.",
-    "4. Mantén tus explicaciones minimalistas y directas, como el lenguaje mismo."
-    return {"messages": [llm.invoke([HumanMessage(content=prompt)] + state["messages"])]}
+    prompt = prompt_clasificador("Go")
+    mensajes_finales = [SystemMessage(content=prompt)] + state["messages"]
+    respuesta = llm.invoke(mensajes_finales)
+    return {"messages": [respuesta]}
 
 def experto_general(state: TutorState):
-    prompt = "Eres un mentor de lógica. No uses lenguajes, usa analogías de la vida real o pseudocódigo."
-    return {"messages": [llm.invoke([HumanMessage(content=prompt)] + state["messages"])]}
+    prompt = """Eres un mentor de lógica y programación. 
+Tu objetivo es explicar conceptos sin usar un lenguaje específico. Usa:
+- Analogías de la vida real
+- Pseudocódigo o diagramas de flujo descritos
+- Ejemplos simples y claros
+Mantén un tono amigable y accesible para principiantes."""
+    
+    mensajes_finales = [SystemMessage(content=prompt)] + state["messages"]
+    respuesta = llm.invoke(mensajes_finales)
+    return {"messages": [respuesta]}
 
 builder = StateGraph(TutorState)
 builder.add_node("clasificador", clasificador_nodo)

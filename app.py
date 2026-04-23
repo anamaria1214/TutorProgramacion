@@ -12,6 +12,10 @@ for msg in st.session_state.chat_history:
     with st.chat_message("user" if isinstance(msg, HumanMessage) else "assistant"):
         st.markdown(msg.content)
 
+if st.sidebar.button("Limpiar historial"):
+    st.session_state.chat_history = []
+    st.rerun()
+
 if prompt := st.chat_input("¿En qué puedo ayudarte hoy?"):
     st.session_state.chat_history.append(HumanMessage(content=prompt))
     with st.chat_message("user"):
@@ -20,8 +24,10 @@ if prompt := st.chat_input("¿En qué puedo ayudarte hoy?"):
     with st.chat_message("assistant"):
         config = {"configurable": {"thread_id": "usuario_streamlit_1"}}
         
+        historial_reducido = st.session_state.chat_history[-3:]
+
         respuesta_grafo = tutor_grafo.invoke(
-            {"messages": st.session_state.chat_history}, 
+            {"messages": historial_reducido}, 
             config
         )
         
