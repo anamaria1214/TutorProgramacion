@@ -1,0 +1,239 @@
+================================================================================
+                    TUTOR DE PROGRAMACIÓN CON LANGGRAPH
+                         Documento Técnico
+================================================================================
+
+--------------------------------------------------------------------------------
+1. EXPLICACIÓN DEL AGENTE
+--------------------------------------------------------------------------------
+
+¿POR QUÉ DEL AGENTE?
+
+La enseñanza de programación presenta múltiples desafíos. Los estudiantes frecuentemente
+enfrentan dificultades al iniciar su aprendizaje debido a la falta de recursos
+accesibles que combinen:
+
+- Explicaciones claras y comprensibles
+- Ejemplos prácticos y funcionales
+- Retroalimentación inmediata
+
+Además, cada lenguaje de programación (Python, Java, Go) tiene su propia sintaxis
+y paradigma. Un ejemplo en Python no siempre es transferible a alguien que aprende
+Java o Go.
+
+¿QUÉ HACE EL AGENTE?
+
+El tutor es un sistema conversacional intelligent que:
+
+1. Detecta automáticamente el lenguaje de programación de la consulta
+2. Responde con explicaciones adaptadas al lenguaje detectado
+3. Proporciona analogías de la vida real para conceptos abstractos
+4. Genera código comentado línea por línea
+5. Incluye prueba de escritorio para verificar funcionamiento
+6. Mantiene memoria persistente entre sesiones
+
+El agente funciona como un tutor personalizado disponible 24/7.
+
+--------------------------------------------------------------------------------
+2. USO DE LANGGRAPH Y ELECCIÓN SOBRE LANGCHAIN
+--------------------------------------------------------------------------------
+
+¿QUÉ ES LANGGRAPH?
+
+LangGraph es una librería de LangChain que permite crear grafos de estados dirigidos.
+Un grafo de estados es una estructura donde:
+
+- Cada nodo representa una operación o función
+- Las aristas definen el flujo entre operaciones
+- El estado fluye de nodo en노odos
+
+¿POR QUÉ LANGGRAPH Y NO LANGCHAIN?
+
+LangChain tradicional funciona para flujos lineales:
+
+    Usuario → Prompt → LLM → Respuesta
+
+Pero tiene limitaciones para ramificaciones condicionales. Si quisieras
+detectar el lenguaje y redirigir a diferentes flujos, tendrías que
+escribir lógica manual compleja.
+
+LangGraph permite enrutamiento dinámico:
+
+                    ┌──→ Experto Python
+                    │
+    Usuario → Clasificador ──→ Experto Java
+                    │
+                    ├──→ Experto Go
+                    │
+                    └──→ Experto General
+
+VENTAJAS DE LANGGRAPH:
+- Enrutamiento condicional nativo con add_conditional_edges
+- Estado compartido entre nodos
+- Memoria persistente integrada
+- Depuración por nodo individual
+- Arquitectura modular y escalable
+
+--------------------------------------------------------------------------------
+3. CÓMO FUNCIONA - EXPLICACIONES DEL CÓDIGO
+--------------------------------------------------------------------------------
+
+ARQUITECTURA GENERAL
+
+El sistema está compuesto por:
+- 1 grafo de LangGraph con 5 nodos
+- 1 modelo de LLM (Groq llama-3.1-8b-instant)
+- 1 base de datos SQLite para memoria
+
+FLUJO DE EJECUCIÓN
+
+    1. El usuario envía una pregunta
+    2. El mensaje se agrega al estado (messages)
+    3. El clasificador analiza la pregunta → detecta el lenguaje
+    4. El grafo enruta al experto correspondiente
+    5. El experto genera la respuesta
+    6. La respuesta se almacena en memoria
+
+COMPONENTES PRINCIPALES
+
+--- Estado (TutorState) ---
+El estado es un diccionario que contiene:
+    - messages: historial de conversación
+    - lenguaje_detectado: resultado del clasificador
+
+--- Nodo Clasificador ---
+Analiza el mensaje del usuario y detecta si es sobre:
+    - python
+    - java
+    - go
+    - general (conceptos de programación)
+
+--- Nodos Expertos ---
+Cada experto tiene su propio prompt especializado:
+    - experto_python: para consultas de Python
+    - experto_java: para consultas de Java
+    - experto_go: para consultas de Go
+    - experto_general: para conceptos generales
+
+PROMPT DEL TUTOR
+
+Las respuestas siguen un formato estructurado:
+    1. Analogía de la vida real (máx 2 párrafos)
+    2. Explicación técnica (1 párrafo)
+    3. Código comentado con números de línea
+    4. Prueba de escritorio (desk check)
+
+MEMORIA PERSISTENTE
+
+Se usa SqliteSaver de LangGraph para guardar el estado en SQLite.
+Esto permite retomar conversaciones días después usando thread_id.
+
+--------------------------------------------------------------------------------
+4. IMPLICACIONES ÉTICAS Y MITIGACIONES
+--------------------------------------------------------------------------------
+
+IMPLICACIONES IDENTIFICADAS
+
+1. EXACTITUD DE LA INFORMACIÓN
+   El LLM puede generar código incorrecto o explicaciones imprecisas.
+   Un tutor humano corrige errores directamente; un agente no.
+
+2. SESGOS EN LAS RESPUESTAS
+   Los modelos pueden presentar sesgos según su entrenamiento.
+
+3. PRIVACIDAD DE DATOS
+   Las conversaciones se almacenan en SQLite localmente.
+
+4. DEPENDENCIA TECNOLÓGICA
+   Estudiantes pueden depender excesivamente del agente.
+
+MEDIDAS IMPLEMENTADAS
+
+1. FORMATO ESTRUCTURADO DE RESPUESTAS
+   El prompt incluye instrucciones de simplicidad y限制
+   - Analogías de la vida real
+   - Código mínimo y claro
+   - Prueba de escritorio obligatoria
+
+2. TRANSPARENCIA
+   El sistema indica claramente que es un agente IA
+   No pretende sustituir tutoría humana
+
+3. LIMITACIÓN DE CONTEXTO
+   El sistema indica cuando no sabe algo o cuando
+   la pregunta está fuera de su alcance
+
+4. PRIVACIDAD LOCAL
+   Los datos se almacenan solo localmente (tutor_memoria.db)
+   No se comparten externamente
+
+5. PROPÓSITO EDUCATIVO
+   Diseño para complementar, no reemplazar, el aprendizaje
+   Fomenta la verificación独立性 del estudiante
+
+--------------------------------------------------------------------------------
+5. EJEMPLOS DE PREGUNTAS Y RESPUESTAS
+--------------------------------------------------------------------------------
+
+EJEMPLO 1: CONCEPTO (Python)
+
+Pregunta: "¿Qué es una variable?"
+Respuesta esperada:
+    - Analogía: Una variable es como una caja etiquetada donde
+      guardas valores. El nombre de la caja es la etiqueta.
+    - Explicación: Un espacio en memoria con un nombre asociado
+      que almacena un valor.
+    - Ejemplo en código.
+
+EJEMPLO 2: CÓDIGO (Python)
+
+Pregunta: "Hazme un código que sume los números del 1 al 5"
+Respuesta esperada:
+    - Explicación breve de lo que hace el código
+    - Código comentado con números de línea:
+        1: suma = 0
+        2: for i in range(1, 6):
+        3:     suma = suma + i
+        4: print(suma)
+    - Prueba de escritorio:
+        Iteración 1: i=1, suma=1
+        Iteración 2: i=2, suma=3
+        Iteración 3: i=3, suma=6
+        Iteración 4: i=4, suma=10
+        Iteración 5: i=5, suma=15
+        Output: 15
+
+EJEMPLO 3: JAVA
+
+Pregunta: "¿Cómo hago un programa que multiplique dos números?"
+Respuesta esperada:
+    - Explicación del programa
+    - Código en Java con Scanner
+    - Prueba de escritorio con valores de ejemplo
+
+EJEMPLO 4: CONCEPTO GENERAL
+
+Pregunta: "¿Qué es un algoritmo?"
+Respuesta esperada:
+    - Analogía amplia (no específica de un lenguaje)
+    - Pseudocódigo o diagrama de flujo descrito
+    - Ejemplo general
+
+--------------------------------------------------------------------------------
+6. CARACTERÍSTICAS TÉCNICAS
+--------------------------------------------------------------------------------
+
+MODELO:     llama-3.1-8b-instant (Groq)
+FRAMEWORK:  LangGraph + LangChain
+MEMORIA:   SQLite (SqliteSaver)
+INTERFAZ:  Terminal o Streamlit
+DEPENDENCIES:
+    - langgraph
+    - langchain-groq
+    - streamlit
+    - python-dotenv
+    - langgraph-checkpoint-sqlite
+
+================================================================================
+Documento generado automáticamente
+================================================================================
